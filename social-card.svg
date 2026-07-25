@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <pattern id="paperLines" width="1200" height="34" patternUnits="userSpaceOnUse">
+      <path d="M0 33.5H1200" stroke="#8f7e6614" stroke-width="1"/>
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#46351f" flood-opacity=".12"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="#f7f1e7"/>
+  <rect width="1200" height="630" fill="url(#paperLines)"/>
+  <circle cx="90" cy="76" r="29" fill="#fffdf8" stroke="#28251f" stroke-width="4"/>
+  <path d="M72 68C83 50 102 88 111 65M70 82C86 65 99 95 111 81" fill="none" stroke="#df6c58" stroke-width="5" stroke-linecap="round"/>
+
+  <text x="138" y="70" fill="#28251f" font-family="DejaVu Sans, sans-serif" font-size="18" font-weight="700" letter-spacing="4">A DAILY WORD WEAVE</text>
+  <text x="72" y="228" fill="#28251f" font-family="Z003, URW Chancery L, cursive" font-size="112" font-style="italic">Hidden Thread</text>
+  <text x="78" y="284" fill="#6f675d" font-family="DejaVu Sans, sans-serif" font-size="27">Follow the words.</text>
+  <text x="78" y="321" fill="#6f675d" font-family="DejaVu Sans, sans-serif" font-size="27">Find what ties them together.</text>
+
+  <g transform="translate(74 365)">
+    <rect width="520" height="78" rx="22" fill="#fffdf8" stroke="#d8cdbc" stroke-width="2"/>
+    <text x="28" y="34" fill="#be4f3d" font-family="DejaVu Sans, sans-serif" font-size="17" font-weight="700">SEASON ONE</text>
+    <text x="28" y="60" fill="#28251f" font-family="DejaVu Sans, sans-serif" font-size="19" font-weight="700">60 original puzzles  •  Easy  •  Moderate  •  Hard</text>
+  </g>
+  <g transform="translate(74 470)">
+    <rect width="228" height="56" rx="28" fill="#28251f"/>
+    <text x="114" y="36" text-anchor="middle" fill="#fffdf8" font-family="DejaVu Sans, sans-serif" font-size="20" font-weight="700">FREE TO PLAY</text>
+  </g>
+
+  <g transform="translate(716 76)" filter="url(#shadow)">
+    <rect width="410" height="478" rx="42" fill="#fffdf8" stroke="#d8cdbc" stroke-width="3"/>
+    <text x="205" y="53" text-anchor="middle" fill="#be4f3d" font-family="Z003, URW Chancery L, cursive" font-size="34" font-style="italic">today’s weave</text>
+
+    <g transform="translate(52 88)">
+      <path d="M25 25L85 85L145 25L205 85L265 25L325 85M25 145L85 205L145 145L205 205L265 145L325 205M25 265L85 325L145 265L205 325L265 265L325 325" fill="none" stroke="#df6c58" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/>
+
+      <g fill="#f7f1e7" stroke="#b9aa94" stroke-width="2">
+        <circle cx="25" cy="25" r="25"/><circle cx="85" cy="25" r="25"/><circle cx="145" cy="25" r="25"/><circle cx="205" cy="25" r="25"/><circle cx="265" cy="25" r="25"/><circle cx="325" cy="25" r="25"/>
+        <circle cx="25" cy="85" r="25"/><circle cx="85" cy="85" r="25"/><circle cx="145" cy="85" r="25"/><circle cx="205" cy="85" r="25"/><circle cx="265" cy="85" r="25"/><circle cx="325" cy="85" r="25"/>
+        <circle cx="25" cy="145" r="25"/><circle cx="85" cy="145" r="25"/><circle cx="145" cy="145" r="25"/><circle cx="205" cy="145" r="25"/><circle cx="265" cy="145" r="25"/><circle cx="325" cy="145" r="25"/>
+        <circle cx="25" cy="205" r="25"/><circle cx="85" cy="205" r="25"/><circle cx="145" cy="205" r="25"/><circle cx="205" cy="205" r="25"/><circle cx="265" cy="205" r="25"/><circle cx="325" cy="205" r="25"/>
+        <circle cx="25" cy="265" r="25"/><circle cx="85" cy="265" r="25"/><circle cx="145" cy="265" r="25"/><circle cx="205" cy="265" r="25"/><circle cx="265" cy="265" r="25"/><circle cx="325" cy="265" r="25"/>
+        <circle cx="25" cy="325" r="25"/><circle cx="85" cy="325" r="25"/><circle cx="145" cy="325" r="25"/><circle cx="205" cy="325" r="25"/><circle cx="265" cy="325" r="25"/><circle cx="325" cy="325" r="25"/>
+      </g>
+
+      <g fill="#28251f" font-family="DejaVu Sans, sans-serif" font-size="23" font-weight="700" text-anchor="middle" dominant-baseline="central">
+        <text x="25" y="25">H</text><text x="85" y="25">A</text><text x="145" y="25">W</text><text x="205" y="25">R</text><text x="265" y="25">O</text><text x="325" y="25">D</text>
+        <text x="25" y="85">E</text><text x="85" y="85">I</text><text x="145" y="85">D</text><text x="205" y="85">E</text><text x="265" y="85">N</text><text x="325" y="85">S</text>
+        <text x="25" y="145">T</text><text x="85" y="145">H</text><text x="145" y="145">R</text><text x="205" y="145">E</text><text x="265" y="145">A</text><text x="325" y="145">D</text>
+        <text x="25" y="205">W</text><text x="85" y="205">O</text><text x="145" y="205">R</text><text x="205" y="205">D</text><text x="265" y="205">S</text><text x="325" y="205">Y</text>
+        <text x="25" y="265">M</text><text x="85" y="265">A</text><text x="145" y="265">S</text><text x="205" y="265">T</text><text x="265" y="265">E</text><text x="325" y="265">R</text>
+        <text x="25" y="325">W</text><text x="85" y="325">E</text><text x="145" y="325">A</text><text x="205" y="325">V</text><text x="265" y="325">E</text><text x="325" y="325">S</text>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Hidden Thread is a free daily word puzzle. Trace themed words through the grid and reveal the Master Thread that ties them together."
+    />
+    <meta name="theme-color" content="#f7f1e7" />
+    <meta property="og:title" content="Hidden Thread — A Daily Word Weave" />
+    <meta
+      property="og:description"
+      content="One fresh word weave every day. Find the themed words and reveal the Master Thread."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="./social-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>Hidden Thread — A Daily Word Weave</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+
+    <!--
+      ADSENSE: Add Google's approved Auto Ads script here only after this
+      site and your publisher account have been approved. Never paste an
+      unverified publisher ID.
+    -->
+  </head>
+  <body>
+    <a class="skip-link" href="#puzzle">Skip to today’s puzzle</a>
+
+    <header class="site-header">
+      <a class="brand" href="./index.html" aria-label="Hidden Thread home">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <span>
+          <strong>Hidden Thread</strong>
+          <small>a daily word weave</small>
+        </span>
+      </a>
+
+      <nav class="header-actions" aria-label="Game options">
+        <button class="icon-button" id="how-to-button" type="button" aria-label="How to play">
+          <span aria-hidden="true">?</span>
+        </button>
+        <button class="icon-button" id="stats-button" type="button" aria-label="View statistics">
+          <span aria-hidden="true">↗</span>
+        </button>
+        <button
+          class="icon-button"
+          id="contrast-button"
+          type="button"
+          aria-label="Turn high contrast mode on"
+          aria-pressed="false"
+        >
+          <span aria-hidden="true">◐</span>
+        </button>
+      </nav>
+    </header>
+
+    <main id="puzzle" class="page-shell">
+      <section class="intro" aria-labelledby="theme-title">
+        <div class="eyebrow-row">
+          <span class="daily-label">Today’s weave</span>
+          <span class="difficulty-badge" id="difficulty-badge">Easy</span>
+          <span class="day-label" id="day-label">Day 1 of 60</span>
+        </div>
+        <h1 id="theme-title">Loading today’s thread…</h1>
+        <p id="theme-clue">A fresh puzzle is being woven for you.</p>
+      </section>
+
+      <div class="game-layout">
+        <section class="puzzle-card" aria-label="Letter grid and controls">
+          <div class="progress-row">
+            <div>
+              <span id="progress-copy">0 of 0 words</span>
+              <span class="mini-note">Every letter belongs.</span>
+            </div>
+            <div class="progress-track" aria-hidden="true">
+              <span id="progress-fill"></span>
+            </div>
+          </div>
+
+          <div
+            class="letter-grid"
+            id="letter-grid"
+            role="grid"
+            aria-label="Six by eight letter grid. Select adjacent letters in any direction."
+          >
+            <svg
+              id="thread-layer"
+              class="thread-layer"
+              viewBox="0 0 600 800"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            ></svg>
+          </div>
+
+          <div class="selection-panel">
+            <div class="current-word-wrap" aria-live="polite">
+              <span class="current-label">Your word</span>
+              <strong id="current-word">Start tracing…</strong>
+            </div>
+            <div class="selection-actions">
+              <button class="text-button" id="clear-button" type="button">Clear</button>
+              <button class="primary-button" id="check-button" type="button">Check word</button>
+            </div>
+          </div>
+
+          <p class="gesture-help">
+            Drag across letters, or tap them in order. Words may bend in any direction.
+          </p>
+        </section>
+
+        <aside class="side-panel" aria-label="Puzzle progress">
+          <section class="paper-card found-card">
+            <div class="card-heading">
+              <div>
+                <span class="hand-note">your finds</span>
+                <h2>Words in the weave</h2>
+              </div>
+              <button class="hint-button" id="hint-button" type="button">
+                Hint <span id="hint-count">3</span>
+              </button>
+            </div>
+            <div class="found-list" id="found-list">
+              <p class="empty-copy">Your words will appear here as you find them.</p>
+            </div>
+            <div class="master-key">
+              <span class="key-swatch"></span>
+              <span><strong>Master Thread</strong> names what connects them all.</span>
+            </div>
+          </section>
+
+          <section class="paper-card season-card">
+            <span class="hand-note">season one</span>
+            <div class="season-heading">
+              <h2>60 daily weaves</h2>
+              <span id="season-progress">1 / 60</span>
+            </div>
+            <div class="season-line" id="season-line" aria-label="Season progress"></div>
+            <p>
+              A new Easy, Moderate, or Hard puzzle arrives each day.
+            </p>
+          </section>
+
+          <section class="next-card" aria-label="Next puzzle countdown">
+            <span>Next thread arrives in</span>
+            <strong id="countdown">--:--:--</strong>
+          </section>
+        </aside>
+      </div>
+
+      <section class="ad-section" aria-label="Reserved advertisement area">
+        <span>Advertisement</span>
+        <div class="ad-placeholder">
+          <strong>This space helps keep Hidden Thread free.</strong>
+          <small>Ads will appear here only after publisher approval.</small>
+        </div>
+      </section>
+
+      <section class="story-section">
+        <span class="hand-note">one quiet puzzle a day</span>
+        <h2>Follow the words. Find what ties them together.</h2>
+        <p>
+          Hidden Thread is a small daily pause: six by eight letters, one theme,
+          and no filler. Find every themed word, then uncover the Master Thread
+          woven through the same board.
+        </p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>© <span id="copyright-year"></span> Hidden Thread</span>
+      <div>
+        <button type="button" data-modal-target="about-modal">About</button>
+        <button type="button" data-modal-target="privacy-modal">Privacy</button>
+        <button type="button" data-modal-target="terms-modal">Terms</button>
+      </div>
+      <p>Independent and original. Not affiliated with The New York Times.</p>
+    </footer>
+
+    <dialog class="game-dialog" id="how-to-modal" aria-labelledby="how-to-title">
+      <div class="dialog-header">
+        <div>
+          <span class="hand-note">a quick guide</span>
+          <h2 id="how-to-title">How to play</h2>
+        </div>
+        <button class="dialog-close" type="button" aria-label="Close">×</button>
+      </div>
+      <ol class="how-list">
+        <li>
+          <span>1</span>
+          <div><strong>Trace connected letters</strong><p>Move up, down, sideways, or diagonally. A word may turn as often as it likes.</p></div>
+        </li>
+        <li>
+          <span>2</span>
+          <div><strong>Follow today’s clue</strong><p>Every answer belongs to the same theme, and every grid letter is used exactly once.</p></div>
+        </li>
+        <li>
+          <span>3</span>
+          <div><strong>Reveal the Master Thread</strong><p>The golden answer names the idea that connects the full weave.</p></div>
+        </li>
+      </ol>
+      <button class="wide-button dialog-close-action" type="button">Let me play</button>
+    </dialog>
+
+    <dialog class="game-dialog" id="stats-modal" aria-labelledby="stats-title">
+      <div class="dialog-header">
+        <div>
+          <span class="hand-note">your notebook</span>
+          <h2 id="stats-title">Statistics</h2>
+        </div>
+        <button class="dialog-close" type="button" aria-label="Close">×</button>
+      </div>
+      <div class="stats-grid">
+        <div><strong id="stat-played">0</strong><span>Played</span></div>
+        <div><strong id="stat-wins">0</strong><span>Completed</span></div>
+        <div><strong id="stat-streak">0</strong><span>Streak</span></div>
+        <div><strong id="stat-best">0</strong><span>Best</span></div>
+      </div>
+      <div class="difficulty-stats">
+        <h3>Completed by level</h3>
+        <div><span>Easy</span><strong id="stat-easy">0</strong></div>
+        <div><span>Moderate</span><strong id="stat-moderate">0</strong></div>
+        <div><span>Hard</span><strong id="stat-hard">0</strong></div>
+      </div>
+    </dialog>
+
+    <dialog class="game-dialog completion-dialog" id="completion-modal" aria-labelledby="completion-title">
+      <div class="completion-stitches" aria-hidden="true">〰 〰 〰</div>
+      <span class="hand-note">beautifully woven</span>
+      <h2 id="completion-title">You found the thread!</h2>
+      <p id="completion-copy">Today’s words are all connected.</p>
+      <div class="result-summary" id="result-summary"></div>
+      <button class="primary-button share-button" id="share-button" type="button">Share result</button>
+      <button class="text-button dialog-close-action" type="button">Close</button>
+    </dialog>
+
+    <dialog class="game-dialog prose-dialog" id="about-modal" aria-labelledby="about-title">
+      <div class="dialog-header">
+        <h2 id="about-title">About Hidden Thread</h2>
+        <button class="dialog-close" type="button" aria-label="Close">×</button>
+      </div>
+      <p>Hidden Thread is an independently created daily word game built around original themes and puzzles. Its first season contains 60 daily boards: 20 Easy, 20 Moderate, and 20 Hard.</p>
+      <p>The goal is simple: make a thoughtful, satisfying word puzzle available to everyone for free.</p>
+    </dialog>
+
+    <dialog class="game-dialog prose-dialog" id="privacy-modal" aria-labelledby="privacy-title">
+      <div class="dialog-header">
+        <h2 id="privacy-title">Privacy</h2>
+        <button class="dialog-close" type="button" aria-label="Close">×</button>
+      </div>
+      <p><strong>Effective July 24, 2026.</strong> This version does not require an account and does not send your puzzle progress to a server. Statistics, settings, and completion history are stored only in your browser through local storage.</p>
+      <p>No advertising or analytics code is active in this release. This notice must be updated before third-party advertising, analytics, contact forms, or other data-collecting services are enabled.</p>
+      <p>You can erase locally stored progress at any time by clearing this site’s browser data.</p>
+    </dialog>
+
+    <dialog class="game-dialog prose-dialog" id="terms-modal" aria-labelledby="terms-title">
+      <div class="dialog-header">
+        <h2 id="terms-title">Terms</h2>
+        <button class="dialog-close" type="button" aria-label="Close">×</button>
+      </div>
+      <p>Hidden Thread is provided free for personal entertainment. Puzzle content, branding, and original site materials may not be republished or sold without permission.</p>
+      <p>The game is supplied as-is, without a guarantee that service will always be uninterrupted. Hidden Thread is independent and is not affiliated with, endorsed by, or sponsored by The New York Times.</p>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="confetti" id="confetti" aria-hidden="true"></div>
+
+    <script type="module" src="./game.js"></script>
+  </body>
+</html>

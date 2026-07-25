@@ -1,0 +1,18 @@
+{
+  "name": "Hidden Thread",
+  "short_name": "Hidden Thread",
+  "description": "A free daily word weave.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f7f1e7",
+  "theme_color": "#f7f1e7",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
