@@ -1,4 +1,5 @@
 import { PUZZLES } from "./puzzles.js";
+import { ANSWER_METADATA } from "./answer-metadata.js";
 
 const GRID_COLUMNS = 6;
 const GRID_ROWS = 8;
@@ -6,12 +7,15 @@ const GRID_SIZE = GRID_COLUMNS * GRID_ROWS;
 const DAY_MS = 86_400_000;
 const LAUNCH_UTC = Date.UTC(2026, 6, 24);
 const STORAGE_PREFIX = "hidden-thread-v1";
+const PROGRESS_SCHEMA_VERSION = 2;
+const DAILY_PUZZLES = buildDailySchedule();
 
 const els = {
   grid: document.querySelector("#letter-grid"),
   threadLayer: document.querySelector("#thread-layer"),
   title: document.querySelector("#theme-title"),
   clue: document.querySelector("#theme-clue"),
+  viewLabel: document.querySelector("#view-label"),
   difficulty: document.querySelector("#difficulty-badge"),
   dayLabel: document.querySelector("#day-label"),
   progressCopy: document.querySelector("#progress-copy"),
@@ -21,6 +25,7 @@ const els = {
   checkButton: document.querySelector("#check-button"),
   hintButton: document.querySelector("#hint-button"),
   hintCount: document.querySelector("#hint-count"),
+  hintJournal: document.querySelector("#hint-journal"),
   foundList: document.querySelector("#found-list"),
   seasonLine: document.querySelector("#season-line"),
   seasonProgress: document.querySelector("#season-progress"),
@@ -28,8 +33,16 @@ const els = {
   toast: document.querySelector("#toast"),
   confetti: document.querySelector("#confetti"),
   contrastButton: document.querySelector("#contrast-button"),
+  archiveButton: document.querySelector("#archive-button"),
+  archiveCardButton: document.querySelector("#archive-card-button"),
+  previousPuzzle: document.querySelector("#previous-puzzle"),
+  todayPuzzle: document.querySelector("#today-puzzle"),
+  nextPuzzle: document.querySelector("#next-puzzle"),
   howButton: document.querySelector("#how-to-button"),
   statsButton: document.querySelector("#stats-button"),
+  archiveModal: document.querySelector("#archive-modal"),
+  archiveList: document.querySelector("#archive-list"),
+  archiveSummary: document.querySelector("#archive-summary"),
   howModal: document.querySelector("#how-to-modal"),
   statsModal: document.querySelector("#stats-modal"),
   completionModal: document.querySelector("#completion-modal"),
@@ -39,11 +52,13 @@ const els = {
 };
 
 const dateInfo = getDateInfo();
-const puzzle = pickPuzzle(dateInfo.dayNumber);
-const puzzleKey = `${STORAGE_PREFIX}:progress:${dateInfo.dateKey}`;
+const selectedDay = getSelectedDay(dateInfo);
+const isTodayView = selectedDay === dateInfo.todaySeasonDay;
+const puzzle = DAILY_PUZZLES[selectedDay - 1];
+const puzzleKey = progressKey(puzzle.id);
 const answers = makeAnswers(puzzle);
 const layout = buildPuzzleLayout(puzzle, answers);
-const savedProgress = readJson(puzzleKey, {});
+const savedProgress = readPuzzleProgress(puzzle, selectedDay);
 
 const state = {
   selection: [],
@@ -52,13 +67,15 @@ const state = {
       ? savedProgress.found.filter((answerId) => answers.some((answer) => answer.id === answerId))
       : [],
   ),
-  hintsLeft: Number.isInteger(savedProgress.hintsLeft)
-    ? clamp(savedProgress.hintsLeft, 0, 3)
-    : 3,
+  hintStages: sanitizeHintStages(savedProgress.hintStages, answers),
+  lastHintId: answers.some((answer) => answer.id === savedProgress.lastHintId)
+    ? savedProgress.lastHintId
+    : null,
   completed: Boolean(savedProgress.completed),
   startedAt: savedProgress.startedAt || null,
   completedAt: savedProgress.completedAt || null,
-  hintedCells: new Set(),
+  hintPulseCell: null,
+  hintLocked: false,
   pointer: {
     active: false,
     moved: false,
@@ -75,14 +92,17 @@ function initialize() {
   document.querySelector("#copyright-year").textContent = String(new Date().getFullYear());
   els.title.textContent = puzzle.title;
   els.clue.textContent = puzzle.clue;
+  els.viewLabel.textContent = isTodayView ? "Today’s weave" : "From the archive";
   els.difficulty.textContent = titleCase(puzzle.difficulty);
   els.difficulty.dataset.level = puzzle.difficulty;
-  els.dayLabel.textContent = `Day ${dateInfo.seasonDay} of ${PUZZLES.length}`;
-  els.seasonProgress.textContent = `${dateInfo.seasonDay} / ${PUZZLES.length}`;
+  els.dayLabel.textContent = `Puzzle ${selectedDay} of ${DAILY_PUZZLES.length}`;
+  els.seasonProgress.textContent = `${dateInfo.unlockedCount} / ${DAILY_PUZZLES.length}`;
 
   renderGrid();
   renderAll();
   renderSeason();
+  renderArchive();
+  renderPuzzleNavigation();
   bindEvents();
   setContrast(readJson(`${STORAGE_PREFIX}:settings`, {}).contrast === true);
   updateCountdown();
@@ -96,10 +116,10 @@ function initialize() {
     });
   }
 
-  if (!localStorage.getItem(`${STORAGE_PREFIX}:welcomed`)) {
+  if (!readStorageItem(`${STORAGE_PREFIX}:welcomed`)) {
     window.setTimeout(() => {
       openDialog(els.howModal);
-      localStorage.setItem(`${STORAGE_PREFIX}:welcomed`, "true");
+      writeStorageItem(`${STORAGE_PREFIX}:welcomed`, "true");
     }, 450);
   }
 }
@@ -110,6 +130,7 @@ function makeAnswers(currentPuzzle) {
     display: displayAnswer(word),
     normalized: normalize(word),
     type: "theme",
+    definition: answerDefinition(currentPuzzle, "theme", word),
   }));
 
   themed.push({
@@ -117,6 +138,7 @@ function makeAnswers(currentPuzzle) {
     display: displayAnswer(currentPuzzle.masterThread),
     normalized: normalize(currentPuzzle.masterThread),
     type: "master",
+    definition: answerDefinition(currentPuzzle, "master", currentPuzzle.masterThread),
   });
 
   return themed;
@@ -224,7 +246,8 @@ function renderGrid() {
     button.type = "button";
     button.dataset.cellIndex = String(index);
     button.setAttribute("role", "gridcell");
-    button.setAttribute("aria-label", `${letter}, row ${row + 1}, column ${column + 1}`);
+    button.dataset.baseLabel = `${letter}, row ${row + 1}, column ${column + 1}`;
+    button.setAttribute("aria-label", button.dataset.baseLabel);
     button.textContent = letter;
     fragment.appendChild(button);
   });
@@ -236,6 +259,7 @@ function renderAll() {
   renderCells();
   renderThreads();
   renderSelection();
+  renderHintJournal();
   renderFoundWords();
   renderProgress();
   renderStats();
@@ -248,17 +272,31 @@ function renderCells() {
         state.found.has(answer.id) &&
         layout.placements.get(answer.id).includes(index),
     );
+    const hintedAnswer = getHintOrder().find(
+      (answer) =>
+        !state.found.has(answer.id) &&
+        (state.hintStages[answer.id] || 0) >= 1 &&
+        layout.placements.get(answer.id)[0] === index,
+    );
 
     cell.classList.toggle("is-selected", state.selection.includes(index));
     cell.classList.toggle("is-found", Boolean(foundAnswer));
     cell.classList.toggle("is-master", foundAnswer?.type === "master");
-    cell.classList.toggle("is-hinted", state.hintedCells.has(index));
+    cell.classList.toggle("is-hint-start", Boolean(hintedAnswer));
+    cell.classList.toggle("is-hint-pulse", state.hintPulseCell === index);
 
     if (foundAnswer) {
       cell.setAttribute(
         "aria-label",
         `${cell.textContent}, part of found ${foundAnswer.type === "master" ? "Master Thread" : "theme word"} ${foundAnswer.display}`,
       );
+    } else if (hintedAnswer) {
+      cell.setAttribute(
+        "aria-label",
+        `${cell.dataset.baseLabel}. Hinted starting tile for ${hintLabel(hintedAnswer)}.`,
+      );
+    } else {
+      cell.setAttribute("aria-label", cell.dataset.baseLabel);
     }
   });
 }
@@ -296,11 +334,55 @@ function drawPath(path, color, width, opacity) {
 function renderSelection() {
   const word = selectedWord();
   els.currentWord.textContent = state.completed
-    ? "Completed for today ✓"
+    ? isTodayView
+      ? "Completed for today ✓"
+      : "Archive puzzle complete ✓"
     : word || "Start tracing…";
   els.checkButton.textContent = state.completed ? "Share result" : "Check word";
   els.checkButton.disabled = !state.completed && state.selection.length < 4;
   els.clearButton.disabled = state.selection.length === 0;
+}
+
+function renderHintJournal() {
+  const hintedAnswers = getHintOrder().filter(
+    (answer) => !state.found.has(answer.id) && (state.hintStages[answer.id] || 0) > 0,
+  );
+  els.hintJournal.replaceChildren();
+
+  if (!hintedAnswers.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-copy";
+    empty.textContent = "Hints will be saved here as you reveal them.";
+    els.hintJournal.appendChild(empty);
+    return;
+  }
+
+  hintedAnswers.forEach((answer) => {
+    const stage = state.hintStages[answer.id] || 0;
+    const entry = document.createElement("article");
+    entry.className = "hint-entry";
+
+    const label = document.createElement("strong");
+    label.textContent = hintLabel(answer);
+    entry.appendChild(label);
+
+    const details = document.createElement("span");
+    details.textContent = [
+      "★ Starting tile marked",
+      stage >= 2 ? `${answer.normalized.length} letters` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    entry.appendChild(details);
+
+    if (stage >= 3) {
+      const definition = document.createElement("p");
+      definition.textContent = answer.definition;
+      entry.appendChild(definition);
+    }
+
+    els.hintJournal.appendChild(entry);
+  });
 }
 
 function renderFoundWords() {
@@ -329,27 +411,133 @@ function renderFoundWords() {
 function renderProgress() {
   const total = answers.length;
   const found = state.found.size;
+  const hintTarget = getNextHintTarget();
+  const nextHintStage = hintTarget
+    ? (state.hintStages[hintTarget.id] || 0) + 1
+    : null;
   els.progressCopy.textContent = `${found} of ${total} words`;
   els.progressFill.style.width = `${(found / total) * 100}%`;
-  els.hintCount.textContent = String(state.hintsLeft);
-  els.hintButton.disabled = state.hintsLeft <= 0 || state.completed;
+  els.hintCount.textContent = nextHintStage ? `${nextHintStage}/3` : "Done";
+  els.hintButton.disabled = state.completed || !hintTarget || state.hintLocked;
+  els.hintButton.setAttribute(
+    "aria-label",
+    hintTarget
+      ? `Reveal hint ${nextHintStage} of 3 for ${hintLabel(hintTarget)}`
+      : "All hint levels revealed",
+  );
 }
 
 function renderSeason() {
   els.seasonLine.replaceChildren();
-  for (let day = 1; day <= PUZZLES.length; day += 1) {
+  for (let day = 1; day <= DAILY_PUZZLES.length; day += 1) {
     const dot = document.createElement("span");
     dot.className = "season-dot";
-    if (day < dateInfo.seasonDay) dot.classList.add("is-past");
-    if (day === dateInfo.seasonDay) dot.classList.add("is-today");
+    if (day <= dateInfo.unlockedCount) dot.classList.add("is-past");
+    if (day === dateInfo.todaySeasonDay) dot.classList.add("is-today");
+    if (day === selectedDay) dot.classList.add("is-active");
     dot.title =
-      day < dateInfo.seasonDay
-        ? `Day ${day} released`
-        : day === dateInfo.seasonDay
-          ? `Day ${day}: today`
-          : `Day ${day}: locked`;
+      day === dateInfo.todaySeasonDay
+        ? `Puzzle ${day}: today`
+        : day <= dateInfo.unlockedCount
+          ? `Puzzle ${day}: released`
+          : `Puzzle ${day}: locked`;
     els.seasonLine.appendChild(dot);
   }
+}
+
+function renderPuzzleNavigation() {
+  els.previousPuzzle.disabled = selectedDay <= 1;
+  els.nextPuzzle.disabled = selectedDay >= dateInfo.unlockedCount;
+  els.todayPuzzle.disabled = isTodayView;
+  els.todayPuzzle.hidden = isTodayView;
+}
+
+function renderArchive() {
+  els.archiveList.replaceChildren();
+  let completedCount = 0;
+
+  for (let day = 1; day <= dateInfo.unlockedCount; day += 1) {
+    const item = document.createElement("li");
+    item.className = "archive-item";
+    const number = document.createElement("span");
+    number.className = "archive-number";
+    number.textContent = String(day);
+
+    const archivedPuzzle = DAILY_PUZZLES[day - 1];
+    const archivedProgress = readStoredProgressForDay(archivedPuzzle, day);
+    const total = archivedPuzzle.words.length + 1;
+    const found = Array.isArray(archivedProgress.found)
+      ? archivedProgress.found.length
+      : 0;
+    const completed = Boolean(archivedProgress.completed);
+    if (completed) completedCount += 1;
+
+    const link = document.createElement("a");
+    link.href = `#puzzle=${day}`;
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      navigateToPuzzle(day);
+    });
+    if (day === selectedDay) {
+      link.setAttribute("aria-current", "page");
+      item.classList.add("is-active");
+    }
+    if (day === dateInfo.todaySeasonDay) item.classList.add("is-today");
+    if (completed) item.classList.add("is-completed");
+
+    const copy = document.createElement("div");
+    copy.className = "archive-copy";
+    const title = document.createElement("strong");
+    const details = document.createElement("span");
+    const status = document.createElement("small");
+    title.textContent = archivedPuzzle.title;
+    details.textContent = `${titleCase(archivedPuzzle.difficulty)} · ${formatReleaseDate(day)}`;
+    status.textContent = day === selectedDay
+      ? `Now playing${day === dateInfo.todaySeasonDay ? " · Today" : ""}`
+      : completed
+        ? "Completed ✓"
+        : found > 0
+          ? `${found} of ${total} words found`
+          : archivedProgress.startedAt
+            ? "In progress"
+            : day === dateInfo.todaySeasonDay
+              ? "Today · Not started"
+              : "Not started";
+    link.setAttribute(
+      "aria-label",
+      `Puzzle ${day}, ${titleCase(archivedPuzzle.difficulty)}, ${archivedPuzzle.title}. ${status.textContent}`,
+    );
+    copy.append(title, details, status);
+    link.append(number, copy);
+    item.appendChild(link);
+    els.archiveList.appendChild(item);
+  }
+
+  if (dateInfo.unlockedCount < DAILY_PUZZLES.length) {
+    const nextDay = dateInfo.unlockedCount + 1;
+    const item = document.createElement("li");
+    item.className = "archive-item is-locked";
+    const locked = document.createElement("div");
+    locked.className = "archive-locked";
+    const number = document.createElement("span");
+    number.className = "archive-number";
+    number.textContent = String(nextDay);
+    const copy = document.createElement("div");
+    copy.className = "archive-copy";
+    const title = document.createElement("strong");
+    const releaseCopy = document.createElement("span");
+    const status = document.createElement("small");
+    title.textContent = "Next puzzle";
+    releaseCopy.textContent = `Unlocks ${formatReleaseDate(nextDay)}`;
+    status.textContent = "🔒 Not yet released";
+    copy.append(title, releaseCopy, status);
+    locked.append(number, copy);
+    item.appendChild(locked);
+    els.archiveList.appendChild(item);
+  }
+
+  els.archiveSummary.textContent =
+    `${dateInfo.unlockedCount} of ${DAILY_PUZZLES.length} released · ${completedCount} completed`;
 }
 
 function bindEvents() {
@@ -368,6 +556,11 @@ function bindEvents() {
     }
   });
   els.hintButton.addEventListener("click", useHint);
+  els.archiveButton.addEventListener("click", openArchive);
+  els.archiveCardButton.addEventListener("click", openArchive);
+  els.previousPuzzle.addEventListener("click", () => navigateToPuzzle(selectedDay - 1));
+  els.todayPuzzle.addEventListener("click", () => navigateToPuzzle(dateInfo.todaySeasonDay));
+  els.nextPuzzle.addEventListener("click", () => navigateToPuzzle(selectedDay + 1));
   els.howButton.addEventListener("click", () => openDialog(els.howModal));
   els.statsButton.addEventListener("click", () => {
     renderStats();
@@ -405,6 +598,8 @@ function bindEvents() {
       clearSelection();
     }
   });
+
+  window.addEventListener("hashchange", () => window.location.reload());
 }
 
 function onPointerDown(event) {
@@ -523,33 +718,50 @@ function submitSelection() {
       : `${match.display} joins the weave.`,
   );
   renderAll();
+  renderArchive();
 
   if (state.found.size === answers.length) completePuzzle();
 }
 
 function useHint() {
-  if (state.hintsLeft <= 0 || state.completed) return;
+  if (state.completed || state.hintLocked) return;
   markStarted();
 
-  const unsolved = answers.filter((answer) => !state.found.has(answer.id));
-  const themed = unsolved.filter((answer) => answer.type === "theme");
-  const target = (themed.length ? themed : unsolved)[0];
-  if (!target) return;
+  const target = getNextHintTarget();
+  if (!target) {
+    showToast("All hint levels have already been revealed.");
+    return;
+  }
 
-  state.hintsLeft -= 1;
-  state.hintedCells = new Set(layout.placements.get(target.id));
+  const nextStage = clamp((state.hintStages[target.id] || 0) + 1, 1, 3);
+  state.hintStages[target.id] = nextStage;
+  state.lastHintId = target.id;
+  state.hintLocked = true;
+
+  if (nextStage === 1) {
+    state.hintPulseCell = layout.placements.get(target.id)[0];
+  }
+
   saveProgress();
   renderAll();
-  showToast(
-    `${target.type === "master" ? "Master Thread" : "Theme word"}: ${target.normalized[0]}… · ${target.normalized.length} letters`,
-    3_300,
-  );
 
-  window.clearTimeout(hintTimer);
-  hintTimer = window.setTimeout(() => {
-    state.hintedCells.clear();
-    renderCells();
-  }, 2_500);
+  if (nextStage === 1) {
+    showToast(`${hintLabel(target)}: the starting tile is marked with a star.`, 3_300);
+    window.clearTimeout(hintTimer);
+    hintTimer = window.setTimeout(() => {
+      state.hintPulseCell = null;
+      renderCells();
+    }, 1_700);
+  } else if (nextStage === 2) {
+    showToast(`${hintLabel(target)}: ${target.normalized.length} letters.`, 3_300);
+  } else {
+    showToast(`${hintLabel(target)}: ${target.definition}`, 5_000);
+  }
+
+  window.setTimeout(() => {
+    state.hintLocked = false;
+    renderProgress();
+  }, 420);
 }
 
 function completePuzzle() {
@@ -559,9 +771,14 @@ function completePuzzle() {
   updateStatsForCompletion();
   saveProgress();
   renderAll();
+  renderArchive();
 
   const master = answers.find((answer) => answer.type === "master");
-  els.completionCopy.textContent = `The Master Thread was ${master.display}. Come back tomorrow for a new ${nextDifficulty()} weave.`;
+  els.completionCopy.textContent = isTodayView
+    ? dateInfo.todaySeasonDay < DAILY_PUZZLES.length
+      ? `The Master Thread was ${master.display}. Come back tomorrow for a new ${nextDifficulty()} weave.`
+      : `The Master Thread was ${master.display}. You have reached the end of Season One.`
+    : `The Master Thread was ${master.display}. Puzzle ${selectedDay} is now complete in your archive.`;
   els.resultSummary.textContent = resultGrid();
   launchConfetti();
   window.setTimeout(() => openDialog(els.completionModal), 420);
@@ -580,9 +797,11 @@ function selectedWord() {
 
 function saveProgress() {
   writeJson(puzzleKey, {
+    schemaVersion: PROGRESS_SCHEMA_VERSION,
     puzzleId: puzzle.id,
     found: [...state.found],
-    hintsLeft: state.hintsLeft,
+    hintStages: state.hintStages,
+    lastHintId: state.lastHintId,
     completed: state.completed,
     startedAt: state.startedAt,
     completedAt: state.completedAt,
@@ -595,32 +814,39 @@ function markStarted() {
   saveProgress();
 
   const stats = getStats();
-  if (!stats.playedDates.includes(dateInfo.dateKey)) {
-    stats.playedDates.push(dateInfo.dateKey);
-    stats.played = stats.playedDates.length;
-    saveStats(stats);
-    renderStats();
+  if (!stats.playedPuzzleIds.includes(puzzle.id)) {
+    stats.playedPuzzleIds.push(puzzle.id);
+    stats.played += 1;
   }
+  if (isTodayView && !stats.playedDates.includes(dateInfo.dateKey)) {
+    stats.playedDates.push(dateInfo.dateKey);
+  }
+  saveStats(stats);
+  renderStats();
+  renderArchive();
 }
 
 function updateStatsForCompletion() {
   const stats = getStats();
-  if (stats.completedDates.includes(dateInfo.dateKey)) return;
+  if (stats.completedPuzzleIds.includes(puzzle.id)) return;
 
-  stats.completedDates.push(dateInfo.dateKey);
-  stats.wins = stats.completedDates.length;
+  stats.completedPuzzleIds.push(puzzle.id);
+  stats.wins += 1;
   stats.byDifficulty[puzzle.difficulty] =
     (stats.byDifficulty[puzzle.difficulty] || 0) + 1;
 
-  const previousDate = localDateOffset(dateInfo.localDate, -1);
-  if (stats.lastCompletedDate === previousDate) {
-    stats.streak += 1;
-  } else {
-    stats.streak = 1;
-  }
+  if (isTodayView && !stats.completedDates.includes(dateInfo.dateKey)) {
+    stats.completedDates.push(dateInfo.dateKey);
+    const previousDate = localDateOffset(dateInfo.localDate, -1);
+    if (stats.lastCompletedDate === previousDate) {
+      stats.streak += 1;
+    } else if (stats.lastCompletedDate !== dateInfo.dateKey) {
+      stats.streak = 1;
+    }
 
-  stats.best = Math.max(stats.best, stats.streak);
-  stats.lastCompletedDate = dateInfo.dateKey;
+    stats.best = Math.max(stats.best, stats.streak);
+    stats.lastCompletedDate = dateInfo.dateKey;
+  }
   saveStats(stats);
 }
 
@@ -633,6 +859,10 @@ function getStats() {
     best: Number(saved.best) || 0,
     playedDates: Array.isArray(saved.playedDates) ? saved.playedDates : [],
     completedDates: Array.isArray(saved.completedDates) ? saved.completedDates : [],
+    playedPuzzleIds: Array.isArray(saved.playedPuzzleIds) ? saved.playedPuzzleIds : [],
+    completedPuzzleIds: Array.isArray(saved.completedPuzzleIds)
+      ? saved.completedPuzzleIds
+      : [],
     lastCompletedDate: saved.lastCompletedDate || null,
     byDifficulty: {
       easy: Number(saved.byDifficulty?.easy) || 0,
@@ -663,20 +893,20 @@ function resultGrid() {
     moderate: "🟠",
     hard: "🔴",
   }[puzzle.difficulty];
-  const hintsUsed = 3 - state.hintsLeft;
+  const hintsUsed = hintRevealCount();
   const elapsed = state.startedAt && state.completedAt
     ? Math.max(1, Math.round((state.completedAt - state.startedAt) / 60_000))
     : 1;
 
-  return `${levelIcon} ${titleCase(puzzle.difficulty)} · 🧵 ${answers.length}/${answers.length}\n💡 ${hintsUsed} hint${hintsUsed === 1 ? "" : "s"} · ⏱ ${elapsed} min`;
+  return `${levelIcon} ${titleCase(puzzle.difficulty)} · 🧵 ${answers.length}/${answers.length}\n💡 ${hintsUsed} hint reveal${hintsUsed === 1 ? "" : "s"} · ⏱ ${elapsed} min`;
 }
 
 async function shareResult() {
   const shareText = [
-    `Hidden Thread — Day ${dateInfo.seasonDay}/${PUZZLES.length}`,
+    `Hidden Thread — Puzzle ${selectedDay}/${DAILY_PUZZLES.length}`,
     resultGrid(),
-    "I found today’s Master Thread. Can you?",
-    window.location.href.split("#")[0],
+    `I found ${isTodayView ? "today’s" : "this"} Master Thread. Can you?`,
+    puzzleUrl(selectedDay),
   ].join("\n");
 
   try {
@@ -696,6 +926,14 @@ async function shareResult() {
 
 function updateCountdown() {
   const now = new Date();
+  if (formatLocalDate(now) !== dateInfo.dateKey) {
+    window.location.reload();
+    return;
+  }
+  if (dateInfo.unlockedCount >= DAILY_PUZZLES.length) {
+    els.countdown.textContent = "Season complete";
+    return;
+  }
   const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const remaining = Math.max(0, next.getTime() - now.getTime());
   const hours = Math.floor(remaining / 3_600_000);
@@ -785,12 +1023,25 @@ function launchConfetti() {
   window.setTimeout(() => els.confetti.replaceChildren(), 2_800);
 }
 
-function pickPuzzle(dayNumber) {
+function buildDailySchedule() {
   const levels = ["easy", "moderate", "hard"];
-  const difficulty = levels[positiveMod(dayNumber, levels.length)];
-  const group = PUZZLES.filter((item) => item.difficulty === difficulty);
-  const round = Math.floor(positiveMod(dayNumber, PUZZLES.length) / levels.length);
-  return group[round % group.length];
+  const groups = levels.map((difficulty) =>
+    PUZZLES.filter((item) => item.difficulty === difficulty),
+  );
+  const schedule = [];
+  const longestGroup = Math.max(...groups.map((group) => group.length));
+
+  for (let round = 0; round < longestGroup; round += 1) {
+    groups.forEach((group) => {
+      if (group[round]) schedule.push(group[round]);
+    });
+  }
+
+  if (schedule.length !== PUZZLES.length) {
+    throw new Error("The daily puzzle schedule is incomplete.");
+  }
+
+  return schedule;
 }
 
 function getDateInfo() {
@@ -800,17 +1051,153 @@ function getDateInfo() {
     localDate.getMonth(),
     localDate.getDate(),
   );
-  const dayNumber = Math.max(0, Math.floor((localUtcDay - LAUNCH_UTC) / DAY_MS));
+  const elapsedDay = Math.floor((localUtcDay - LAUNCH_UTC) / DAY_MS);
+  const unlockedCount = clamp(elapsedDay + 1, 1, DAILY_PUZZLES.length);
   return {
     localDate,
-    dayNumber,
-    seasonDay: positiveMod(dayNumber, PUZZLES.length) + 1,
+    elapsedDay,
+    unlockedCount,
+    todaySeasonDay: unlockedCount,
     dateKey: formatLocalDate(localDate),
   };
 }
 
+function getSelectedDay(info) {
+  const match = window.location.hash.match(/^#puzzle=(\d+)$/);
+  const requested = match ? Number(match[1]) : info.todaySeasonDay;
+  return Number.isInteger(requested) && requested >= 1 && requested <= info.unlockedCount
+    ? requested
+    : info.todaySeasonDay;
+}
+
 function nextDifficulty() {
-  return titleCase(["easy", "moderate", "hard"][(dateInfo.dayNumber + 1) % 3]);
+  const nextPuzzle = DAILY_PUZZLES[dateInfo.todaySeasonDay];
+  return nextPuzzle ? titleCase(nextPuzzle.difficulty) : "Season Two";
+}
+
+function answerDefinition(currentPuzzle, type, value) {
+  const key = `${currentPuzzle.id}|${type}|${normalize(value)}`;
+  const metadata = ANSWER_METADATA[key];
+  const definition = typeof metadata === "string" ? metadata : metadata?.definition;
+  return definition || `A word or phrase connected with “${currentPuzzle.title}.”`;
+}
+
+function sanitizeHintStages(savedStages, answerList) {
+  const result = {};
+  const source = savedStages && typeof savedStages === "object" ? savedStages : {};
+  answerList.forEach((answer) => {
+    result[answer.id] = clamp(Number.parseInt(source[answer.id], 10) || 0, 0, 3);
+  });
+  return result;
+}
+
+function getHintOrder() {
+  return [
+    answers.find((answer) => answer.type === "master"),
+    ...answers.filter((answer) => answer.type === "theme"),
+  ].filter(Boolean);
+}
+
+function getNextHintTarget() {
+  return getHintOrder().find(
+    (answer) =>
+      !state.found.has(answer.id) &&
+      (state.hintStages[answer.id] || 0) < 3,
+  );
+}
+
+function hintLabel(answer) {
+  if (answer.type === "master") return "Master Thread";
+  const themedAnswers = answers.filter((item) => item.type === "theme");
+  return `Theme word ${themedAnswers.findIndex((item) => item.id === answer.id) + 1}`;
+}
+
+function hintRevealCount() {
+  return Object.values(state.hintStages).reduce(
+    (total, stage) => total + clamp(Number(stage) || 0, 0, 3),
+    0,
+  );
+}
+
+function progressKey(puzzleId) {
+  return `${STORAGE_PREFIX}:season-1:progress:${puzzleId}`;
+}
+
+function legacyProgressKey(day) {
+  return `${STORAGE_PREFIX}:progress:${formatLocalDate(releaseDateForDay(day))}`;
+}
+
+function readPuzzleProgress(currentPuzzle, day) {
+  const current = readJson(progressKey(currentPuzzle.id), null);
+  if (current && (!current.puzzleId || current.puzzleId === currentPuzzle.id)) {
+    return current;
+  }
+
+  const legacy = readJson(legacyProgressKey(day), null);
+  if (!legacy || (legacy.puzzleId && legacy.puzzleId !== currentPuzzle.id)) return {};
+
+  const migrated = {
+    schemaVersion: PROGRESS_SCHEMA_VERSION,
+    puzzleId: currentPuzzle.id,
+    found: Array.isArray(legacy.found) ? legacy.found : [],
+    hintStages: {},
+    lastHintId: null,
+    completed: Boolean(legacy.completed),
+    startedAt: legacy.startedAt || null,
+    completedAt: legacy.completedAt || null,
+  };
+  writeJson(progressKey(currentPuzzle.id), migrated);
+  return migrated;
+}
+
+function readStoredProgressForDay(currentPuzzle, day) {
+  const current = readJson(progressKey(currentPuzzle.id), null);
+  if (current && (!current.puzzleId || current.puzzleId === currentPuzzle.id)) {
+    return current;
+  }
+  const legacy = readJson(legacyProgressKey(day), null);
+  return legacy && (!legacy.puzzleId || legacy.puzzleId === currentPuzzle.id)
+    ? legacy
+    : {};
+}
+
+function releaseDateForDay(day) {
+  const launch = new Date(LAUNCH_UTC);
+  return new Date(
+    launch.getUTCFullYear(),
+    launch.getUTCMonth(),
+    launch.getUTCDate() + day - 1,
+  );
+}
+
+function formatReleaseDate(day) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(releaseDateForDay(day));
+}
+
+function navigateToPuzzle(day) {
+  if (!Number.isInteger(day) || day < 1 || day > dateInfo.unlockedCount) return;
+  if (day === selectedDay) {
+    els.archiveModal.close();
+    els.title.focus();
+    return;
+  }
+  window.location.hash = `puzzle=${day}`;
+}
+
+function puzzleUrl(day) {
+  const baseUrl = window.location.href.split("#")[0];
+  return day === dateInfo.todaySeasonDay ? baseUrl : `${baseUrl}#puzzle=${day}`;
+}
+
+function openArchive() {
+  openDialog(els.archiveModal);
+  window.requestAnimationFrame(() => {
+    els.archiveList.querySelector(".is-active a")?.focus();
+  });
 }
 
 function getNeighbors(index) {
@@ -932,9 +1319,25 @@ function localDateOffset(date, offset) {
   return formatLocalDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() + offset));
 }
 
+function readStorageItem(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorageItem(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // The game remains playable if private browsing blocks storage.
+  }
+}
+
 function readJson(key, fallback) {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = readStorageItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -943,7 +1346,7 @@ function readJson(key, fallback) {
 
 function writeJson(key, value) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    writeStorageItem(key, JSON.stringify(value));
   } catch {
     // The game remains playable if private browsing blocks storage.
   }

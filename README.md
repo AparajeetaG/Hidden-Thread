@@ -3,6 +3,23 @@
 Hidden Thread is a free, mobile-friendly daily word game. Season One contains
 60 original puzzles: 20 Easy, 20 Moderate, and 20 Hard.
 
+## Version 2
+
+Version 2 keeps the original 6 × 8 boards, daily Easy–Moderate–Hard rotation,
+touch tracing, statistics, sharing, and offline support. It adds:
+
+- progressive hints for every unsolved answer;
+- the Master Thread as the first hint target;
+- a persistent starred starting tile on Hint 1;
+- the answer length on Hint 2;
+- a short plain-English meaning on Hint 3;
+- a puzzle-number archive containing every released game;
+- separate saved progress for every daily and archived puzzle;
+- Previous, Today, and Next navigation between released puzzles.
+
+The next Hint click moves to the next unsolved answer after all three hint
+levels have been shown. Solved answers are skipped automatically.
+
 ## Publish free with GitHub Pages
 
 1. Create a new public GitHub repository, for example `hidden-thread`.
@@ -42,6 +59,12 @@ const LAUNCH_UTC = Date.UTC(2026, 6, 24);
 JavaScript months begin at zero, so `6` means July. Change the date before
 launching if needed.
 
+The archive unlocks Puzzle 1, Puzzle 2, and so on according to that same
+schedule. Only released puzzles are playable. After all 60 have been released,
+the full Season One archive stays open rather than restarting at Puzzle 1.
+Archive links use a hash such as `#puzzle=2`, so they also work with GitHub
+Pages and the offline service worker.
+
 ## Add more puzzles
 
 Open `puzzles.js` and append another puzzle object. Each board is 6 × 8, so the
@@ -53,13 +76,27 @@ spaces and punctuation are removed. Every answer should:
 - be original and fit its clue cleanly;
 - appear only once within its puzzle.
 
-Update the cache name in `sw.js` whenever you publish changed files:
+Every answer also needs one short, spoiler-safe definition in
+`answer-metadata.js`. Its key contains the puzzle ID, answer type, and normalized
+answer, for example:
 
 ```js
-const CACHE_NAME = "hidden-thread-v2";
+"E01|master|BREAKFAST": {
+  definition: "The first meal eaten in the morning."
+}
+```
+
+Update the cache name in `sw.js` whenever you publish changed files. Version 2
+uses `hidden-thread-v2`, so the next release should use `hidden-thread-v3`:
+
+```js
+const CACHE_NAME = "hidden-thread-v3";
 ```
 
 That ensures returning players receive the newest version.
+
+Do not change `STORAGE_PREFIX` just to publish a new version. It is intentionally
+separate from the service-worker cache name so players keep their progress.
 
 ## Advertising
 

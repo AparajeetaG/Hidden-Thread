@@ -1,7 +1,7 @@
 {
   "name": "Hidden Thread",
   "short_name": "Hidden Thread",
-  "description": "A free daily word weave.",
+  "description": "A free daily word weave with progressive hints and a past-puzzle archive.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f7f1e7",

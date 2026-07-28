@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
-      content="Hidden Thread is a free daily word puzzle. Trace themed words through the grid and reveal the Master Thread that ties them together."
+      content="Hidden Thread is a free daily word puzzle with progressive hints and an archive of every released weave."
     />
     <meta name="theme-color" content="#f7f1e7" />
     <meta property="og:title" content="Hidden Thread — A Daily Word Weave" />
     <meta
       property="og:description"
-      content="One fresh word weave every day. Find the themed words and reveal the Master Thread."
+      content="One fresh word weave every day, progressive hints when you need them, and an archive to catch up anytime."
     />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="./social-card.png" />
@@ -36,7 +36,7 @@
     -->
   </head>
   <body>
-    <a class="skip-link" href="#puzzle">Skip to today’s puzzle</a>
+    <a class="skip-link" href="#puzzle">Skip to the puzzle</a>
 
     <header class="site-header">
       <a class="brand" href="./index.html" aria-label="Hidden Thread home">
@@ -50,6 +50,9 @@
       </a>
 
       <nav class="header-actions" aria-label="Game options">
+        <button class="icon-button" id="archive-button" type="button" aria-label="Open puzzle archive">
+          <span aria-hidden="true">▦</span>
+        </button>
         <button class="icon-button" id="how-to-button" type="button" aria-label="How to play">
           <span aria-hidden="true">?</span>
         </button>
@@ -71,12 +74,17 @@
     <main id="puzzle" class="page-shell">
       <section class="intro" aria-labelledby="theme-title">
         <div class="eyebrow-row">
-          <span class="daily-label">Today’s weave</span>
+          <span class="daily-label" id="view-label">Today’s weave</span>
           <span class="difficulty-badge" id="difficulty-badge">Easy</span>
           <span class="day-label" id="day-label">Day 1 of 60</span>
         </div>
-        <h1 id="theme-title">Loading today’s thread…</h1>
+        <h1 id="theme-title" tabindex="-1">Loading today’s thread…</h1>
         <p id="theme-clue">A fresh puzzle is being woven for you.</p>
+        <nav class="puzzle-navigation" aria-label="Browse released puzzles">
+          <button id="previous-puzzle" type="button">← Previous</button>
+          <button id="today-puzzle" type="button">Today</button>
+          <button id="next-puzzle" type="button">Next →</button>
+        </nav>
       </section>
 
       <div class="game-layout">
@@ -130,8 +138,11 @@
                 <h2>Words in the weave</h2>
               </div>
               <button class="hint-button" id="hint-button" type="button">
-                Hint <span id="hint-count">3</span>
+                Hint <span id="hint-count">1/3</span>
               </button>
+            </div>
+            <div class="hint-journal" id="hint-journal" aria-live="polite">
+              <p class="empty-copy">Hints will be saved here as you reveal them.</p>
             </div>
             <div class="found-list" id="found-list">
               <p class="empty-copy">Your words will appear here as you find them.</p>
@@ -150,8 +161,12 @@
             </div>
             <div class="season-line" id="season-line" aria-label="Season progress"></div>
             <p>
-              A new Easy, Moderate, or Hard puzzle arrives each day.
+              A new Easy, Moderate, or Hard puzzle arrives each day. Missed one?
+              Open the archive and catch up anytime.
             </p>
+            <button class="archive-card-button" id="archive-card-button" type="button">
+              View puzzle archive
+            </button>
           </section>
 
           <section class="next-card" aria-label="Next puzzle countdown">
@@ -211,8 +226,28 @@
           <span>3</span>
           <div><strong>Reveal the Master Thread</strong><p>The golden answer names the idea that connects the full weave.</p></div>
         </li>
+        <li>
+          <span>4</span>
+          <div><strong>Ask for progressive hints</strong><p>For each unsolved answer, three clicks reveal its starred starting tile, letter count, then a simple meaning. Spaces do not count, and the Master Thread comes first.</p></div>
+        </li>
+        <li>
+          <span>5</span>
+          <div><strong>Catch up in the archive</strong><p>Every released puzzle stays playable. Open the archive and choose it by puzzle number.</p></div>
+        </li>
       </ol>
       <button class="wide-button dialog-close-action" type="button">Let me play</button>
+    </dialog>
+
+    <dialog class="game-dialog archive-dialog" id="archive-modal" aria-labelledby="archive-title">
+      <div class="dialog-header archive-dialog-header">
+        <div>
+          <span class="hand-note">season one</span>
+          <h2 id="archive-title">Puzzle archive</h2>
+          <p id="archive-summary">Released puzzles will collect here.</p>
+        </div>
+        <button class="dialog-close" type="button" aria-label="Close archive">×</button>
+      </div>
+      <ol class="archive-list" id="archive-list"></ol>
     </dialog>
 
     <dialog class="game-dialog" id="stats-modal" aria-labelledby="stats-title">
